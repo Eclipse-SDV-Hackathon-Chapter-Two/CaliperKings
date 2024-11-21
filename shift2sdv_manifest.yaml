@@ -8,43 +8,11 @@ workloads:
     accessRights:
       allow: []
       deny: []
-    restartPolicy: NEVER 
+    restartPolicy: NEVER
     dependencies:
     runtimeConfig: |
-       image: ghcr.io/felixmoelders/ankaios-dashboard:v0.3
-       commandOptions: ["-p", "5001:5001", "-e", "PASSWORD=admin"]
-    controlInterfaceAccess:
-        allowRules:
-          - type: StateRule
-            operation: ReadWrite
-            filterMask:
-              - "desiredState"
-              - "workloadStates"
-  web_ivi:
-    runtime: podman
-    agent: hpc2
-    restartPolicy: NEVER
-    runtimeConfig: |
-      image: ghcr.io/eclipse-sdv-hackathon-chapter-two/shift2sdv/web_ivi:latest
-      commandOptions: [ "--net=host", "--ipc=host"]
-<<<<<<< HEAD
-  workload_administrator:
-=======
-  log_publisher_app:
-    runtime: podman
-    agent: hpc2
-    restartPolicy: NEVER
-    runtimeConfig: |
-      image: ghcr.io/eclipse-sdv-hackathon-chapter-two/shift2sdv/log_publisher_app:latest
-      commandOptions: [ "--net=host", "--ipc=host"]
-  workload_starter:
->>>>>>> 5e74ced (feat: add ankaios resource for log_publisher_app)
-    runtime: podman
-    agent: hpc1
-    restartPolicy: NEVER
-    runtimeConfig: |
-      image: ghcr.io/eclipse-sdv-hackathon-chapter-two/shift2sdv/workload_administrator:latest
-      commandOptions: [ "--net=host", "-e", "VIN=42", "-e", "MQTT_BROKER_ADDR=3345d71141b94f0eb2ec8c60a153d4d3.s1.eu.hivemq.cloud", "-e", "MQTT_BROKER_PORT=8884", "-e", "MQTT_BROKER_USER=hackathon", "-e", "MQTT_BROKER_PASS=CaliperKing7"]
+      image: ghcr.io/felixmoelders/ankaios-dashboard:v0.3
+      commandOptions: ["-p", "5001:5001", "-e", "PASSWORD=admin"]
     controlInterfaceAccess:
       allowRules:
         - type: StateRule
@@ -52,3 +20,17 @@ workloads:
           filterMask:
             - "desiredState"
             - "workloadStates"
+  web_ivi:
+    runtime: podman
+    agent: hpc2
+    restartPolicy: NEVER
+    runtimeConfig: |
+      image: ghcr.io/eclipse-sdv-hackathon-chapter-two/shift2sdv/web_ivi:latest
+      commandOptions: [ "--net=host", "--ipc=host"]
+  log_publisher_app:
+    runtime: podman
+    agent: hpc2
+    restartPolicy: NEVER
+    runtimeConfig: |
+      image: ghcr.io/eclipse-sdv-hackathon-chapter-two/shift2sdv/log_publisher_app:latest
+      commandOptions: [ "--net=host", "--ipc=host", "-e", "THRESHOLD_VALUE=2.25"]

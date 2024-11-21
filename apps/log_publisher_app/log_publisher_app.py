@@ -1,4 +1,4 @@
-import sys, time, json, logging
+import sys, time, json, logging, os
 
 import ecal.core.core as ecal_core
 import requests
@@ -7,6 +7,7 @@ from enum import Enum
 from signals import Signals, parse_signals
 from report_dto import ReportDTO
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger("Log Publisher App")
 stdout = logging.StreamHandler(stream=sys.stdout)
@@ -24,8 +25,15 @@ collection of records
 '''
 
 class LogPublisherApp(object):
-    criticial_speed_thresholds = {20: 1, 30: 2, 40: 3}
+    executor = ThreadPoolExecutor(max_workers=5)
+    test_val = float(os.getenv("THRESHOLD_VALUE", 40))
+    criticial_speed_thresholds = {20: 1, 30: 2, test_val: 3}
     vehicle_dynamics_samples = deque(maxlen=50)
+
+    reports = deque()
+
+    def __init__(self):
+        self.executor.submit(self.publish_reports)
 
         
     def run(self):
@@ -38,60 +46,65 @@ class LogPublisherApp(object):
         while ecal_core.ok():
             time.sleep(0.5)
 
-    def publish_report(self, critical_level, timestamp):
-        report = ReportDTO(
-            schema_version="1.0",
-            vehicle_id="XYZ123", 
-            stop_timestamp=timestamp, 
-            criticality_level=critical_level, 
-            vehicle_dynamics=self.vehicle_dynamics_samples
-        )
-        
+    def publish_reports(self):
+        print("Started side service")
+        while True:
+            while len(self.reports) > 0:
+                report = self.reports.pop()
+                try:
+                    self.publish_report(report)
+                except Exception as e:
+                    print(f"Exception: {e}")
+
+            time.sleep(1)
+
+    def publish_report(self, report):
         report_json = json.dumps(report.to_dict())
-        logger.info('report', report_json)
-        url = "http://example.com/api/report"
+        url = "http://172.16.1.41:5010/api/reports"
         headers = {"Content-Type": "application/json"}
         response = requests.post(url, headers=headers, data=report_json)
-        logger.info(response.status_code, response.text)
-
+        print("sent")
+        
+    
     # Callback for receiving vehicle_dynamics messages
     def vehicle_dynamics_callback(self, topic_name, msg, time):
         def add_signal():
             signal_schema: Signals = parse_signals(msg)
             self.vehicle_dynamics_samples.append(signal_schema)
+            # print([sample.speed for sample in self.vehicle_dynamics_samples])
 
         def detect_trigger() -> int:
-            curr_signal = self.vehicle_dynamics_samples[-1]
-            last_signal = self.vehicle_dynamics_samples[-2]
+            if len(self.vehicle_dynamics_samples) < 50:
+                return 0
+            else:
+                #TODO: extract method
+                curr_signal = self.vehicle_dynamics_samples[-1]
+                last_signal = self.vehicle_dynamics_samples[0]
 
-            if curr_signal.speed < last_signal.speed:
-                speed_diff = last_signal.speed - curr_signal.speed
-
-                for key, value in self.criticial_speed_thresholds.items():
-                    if speed_diff > key:
-                        return value
+                if curr_signal.speed < last_signal.speed:
+                    speed_diff = last_signal.speed - curr_signal.speed
+                    for key, value in self.criticial_speed_thresholds.items():
+                        if speed_diff >= key:
+                            return value
                 return 0
 
         try:
             add_signal()
             critical_level = detect_trigger()
             if critical_level > 0:
-                self.publish_report(critical_level, time)
+                report = ReportDTO(
+                    schema_version="1.0",
+                    vehicle_id="XYZ123", 
+                    stop_timestamp=time, 
+                    criticality_level=critical_level, 
+                    vehicle_dynamics=self.vehicle_dynamics_samples
+                )
+                self.reports.append(report)
 
         except json.JSONDecodeError:
             logger.error(f"Error: Could not decode message: '{msg}'")
         except Exception as e:
             logger.error(f"Error: {e}")
-
-
-# def object_detection_callback(topic_name, msg, time):
-#     try:
-#         json_msg = json.loads(msg)
-#         logger.info(f"Received Object Detection: {msg}")
-#     except json.JSONDecodeError:
-#         logger.error(f"Error: Could not decode message: '{msg}'")
-#     except Exception as e:
-#         logger.error(f"Error: {e}")
 
 def main():
     logger.info("Starting Log Publisher App")

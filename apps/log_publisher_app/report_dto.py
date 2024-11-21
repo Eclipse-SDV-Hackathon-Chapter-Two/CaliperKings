@@ -10,7 +10,6 @@ from enum import Enum
 class ReportDTO:
     schema_version: str
     vehicle_id: str
-    start_timestamp: str
     stop_timestamp: str
     criticality_level: int
     vehicle_dynamics: List
@@ -19,7 +18,6 @@ class ReportDTO:
         return {
             "schema_version": self.schema_version,
             "vehicle_id": self.vehicle_id,
-            "start_timestamp": self.start_timestamp,
             "stop_timestamp": self.stop_timestamp,
             "criticality_level": self.criticality_level,
             "vehicle_dynamics": [signal.to_dict() for signal in self.vehicle_dynamics]
